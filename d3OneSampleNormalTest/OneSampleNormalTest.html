@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+	#svg-container {
+		width: 1000px;
+		height: 600px;
+		text-align: center;
+	}
+
+	div.svg {
+		width:600px;
+		height: 500px;
+		float: left;
+	}
+
+	div#sidebar {
+		width:175px;
+		height:400px;
+		text-align:left;
+		float:left;
+	}
+
+	div#char-div {
+		text-align: center;
+		width:1000px;
+	}
+
+    .axis path,
+    .axis line {
+        fill: none;
+        stroke: black;
+        shape-rendering: crispEdges;
+    }
+
+    .axis text {
+        font-family: sans-serif;
+        font-size: 11px;
+    }
+
+    td.upper_line { border-top:solid 1px black; }
+
+    table.fraction { text-align: center; vertical-align: middle;
+        margin-top:0.5em; margin-bottom:0.5em; line-height: 2em; }
+
+    div#samp-size-div {
+    	position:absolute;
+    	top:50px;
+    }
+
+    div#mu-div {
+    	position:absolute;
+    	top:90px;
+    }
+
+    div#sigma-div {
+    	position:absolute;
+    	top:130px;
+    }
+
+    div#xbar-div {
+    	position:absolute;
+    	top:170px;
+    }
+
+    div#submit-button-div {
+    	position:absolute;
+    	top:210px;
+    }
+
+    div#alt-hyp-div {
+    	position:absolute;
+    	top:240px;
+    }
+
+    div#test-stat-div {
+    	position:absolute;
+    	top:290px;
+    }
+
+    div#p-val-div {
+    	position:absolute;
+    	top:400px;
+    }
+
+    input#mu {
+    	position:absolute;
+    	top: 0px;
+    	left:30px;
+    }
+
+    input#sigma {
+    	position:absolute;
+    	top: 0px;
+    	left:30px;
+    }
+
+    input#xbar {
+    	position:absolute;
+    	top:0px;
+    	left:30px;
+    }
+
+    input#samp-size {
+    	position:absolute;
+    	top:0px;
+    	left:95px;
+    	width:60px;
+    }
+
+    select#alt-hyp-select {
+    	position:absolute;
+    	top:25px;
+    }
+
+</style>
+<body>
+<div id="svg-container">
+<div id='sidebar'>
+	<div id="samp-size-div">
+		Sample Size: <input type = "text" id="samp-size">
+	</div>
+	<div id="mu-div">
+		&mu;<sub>0</sub>: <input type = "text" id="mu"></input>
+	</div>
+	<div id ="sigma-div">
+		&sigma;: <input type = "text" id = "sigma">
+	</div>
+	<div id="xbar-div">
+		x&#772;: <input type = "text" id = "xbar">
+	</div>
+	<div id ="submit-button-div">
+		<button id="submit-button">Submit</button>
+	</div>
+	<div id = "alt-hyp-div">
+		<u>Alternative Hypothesis:</u> <br>
+		<select id="alt-hyp-select">
+			<option value = "1">H<sub>a</sub>: &mu; > &mu;<sub>0</sub></option>
+			<option value = "2">H<sub>a</sub>: &mu; < &mu;<sub>0</sub></option>
+			<option value = "3">H<sub>a</sub>: &mu; &ne; &mu;<sub>0</sub></option>
+		</select>
+	</div>
+	<div id='test-stat-div'>
+		<u>Test Statistic:</u>
+		<table class="fraction" align="center" cellpadding="0" cellspacing="0">
+			<tr>
+				<td rowspan="2" nowrap="nowrap">
+    				z =   
+				</td>
+				<td nowrap="nowrap">
+     				(x&#772; - &mu;<sub>0</sub>)
+				</td>
+				<td rowspan = "2" nowrap="nowrap" class="z-val">
+					= 
+				</td>
+			</tr>
+			<tr>
+				<td class="upper_line">
+     				<sup>&sigma;</sup>&frasl;<sub>&radic;n</sub>
+				</td>
+			</tr>
+		</table>
+	</div>
+	<div id="p-val-div">
+	<u>p-value:</u>
+	</div>
+</div>
+<div class="svg"></div>
+</div>
+
+<div id = "results-div">
+</div>
+</body>
+<script src= "./jquery-1.10.2.min.js" type="text/javascript"></script>
+<script src="./d3.v3.js"></script>
+<script>
+// Calculate value of standard normal distribution at all xVals
+function normPDF(x, mu, sigma)
+{
+	var res = (1 / (sigma * Math.sqrt(Math.PI))) * Math.exp((-1) / (2 * sigma) * (x - mu) * (x - mu));
+	return(res); 
+}
+
+// cdf of normal distribution
+function cdf(x, mean, variance) {
+  return 0.5 * (1 + erf((x - mean) / (Math.sqrt(2 * variance))));
+}
+
+// error function for calculating cdf of normal distribution
+// Thanks to Handbook of Mathematical Functions, formula 7.1.26 for the below erf function
+function erf(x) {
+  // save the sign of x
+  var sign = (x >= 0) ? 1 : -1;
+  x = Math.abs(x);
+
+  // constants
+  var a1 =  0.254829592;
+  var a2 = -0.284496736;
+  var a3 =  1.421413741;
+  var a4 = -1.453152027;
+  var a5 =  1.061405429;
+  var p  =  0.3275911;
+
+  // A&S formula 7.1.26
+  var t = 1.0/(1.0 + p*x);
+  var y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+  return sign * y; // erf(-x) = -erf(x);
+}
+// Get Min value of array
+function getMinOfArray(numArray) {
+  var lenArray = numArray.length;
+  var min = numArray[0];
+  for (var i = 1; i < lenArray; i++) {
+    if (numArray[i] < min) {min = numArray[i];}
+  }
+  return min;
+}
+
+// Get Max value of array
+function getMaxOfArray(numArray) {
+  var lenArray = numArray.length;
+  var max = numArray[0];
+    for (var i = 1; i < lenArray; i++) {
+    if (numArray[i] > max) {max = numArray[i];}
+  }
+  return max;
+}
+
+$(document).ready(function() {
+
+	var width = 700,
+	    height = 600, yAxisTitle = "Density (Probability) value", xAxisTitle = 'X value', yMax, xMax, circleData = [], dataOrig;
+	// Set up scales
+
+	var padding = 60;
+
+	var xVals = [], yVals = [];
+
+	// Create xVals to evaluate path at
+	for (var i = 0; i < 1201; i++)
+	{
+		+xVals.push((-6 + i * 0.01).toFixed(2));
+	}
+
+	for (var i = 0; i < 1201; i++)
+	{
+		yVals.push(normPDF(xVals[i], 0, 1));
+	}
+
+	// lineData for drawing normal curve
+	lineData = [];
+
+	for (var i = 0; i < 1201; i++)
+	{
+		var currObj = new Object();
+		currObj.x = xVals[i];
+		currObj.y = yVals[i];
+		lineData.push(currObj);
+	}
+
+	// Setup x and y scales to map to SVG 
+	var xScale = d3.scale.linear().domain([-6, 6]).range([padding, width-padding]);
+	var yScale = d3.scale.linear().domain([getMinOfArray(yVals), getMaxOfArray(yVals)]).range([height-padding, padding]);
+
+	var xAxis = d3.svg.axis().scale(xScale).orient("bottom");
+	var yAxis = d3.svg.axis().scale(yScale).orient("left");
+
+	//This is the accessor function for drawing the path
+	var lineFunction = d3.svg.line().x(function(d) { return xScale(d.x); }).y(function(d) { return yScale(d.y); }).interpolate("linear");
+
+	var svg = d3.select("div.svg").append("svg").attr('width', width).attr('height', height);
+
+	// Append Plot title, yAxisTitle and xAxisTitle
+	svg.append('text').attr("x", width / 2).attr("y", padding / 2).attr("text-anchor", "middle").text("Standard Normal Distribution");
+
+	// Append axes
+	svg.append("g").attr("class", "axis").attr("transform", "translate(0," + (height - padding) + ")").call(xAxis);
+	svg.append("g").attr("class", "axis").attr("transform", "translate(" + padding + ",0)").call(yAxis);
+
+	svg.append("path").attr("d", lineFunction(lineData))
+	                            .attr("stroke", "black")
+	                            .attr("stroke-width", 2)
+	                            .attr("fill", "none");
+
+
+	// Add reactivity after click of button #submit-button
+
+	$("button#submit-button").on("click", function() {
+		var xBar = $("input#xbar")[0].value;
+		var mu = $("input#mu")[0].value;
+		var sigma = $("input#sigma")[0].value;
+		var n = $("input#samp-size")[0].value;
+		if (xBar === "" | mu === "" | sigma === "" | n === "") 
+		{
+			alert("Are you sure you entered values for each quantity necessary? Check the input boxes to make sure!");
+		} else {
+			if (isNaN(xBar) | isNaN(mu) | isNaN(sigma) | isNaN(n) | n % 1 !== 0) {
+				alert("Are you sure you entered numbers for each quantity necessary? Also, was n an integer?");
+			} else {
+
+				svg.selectAll('path.poly').remove();
+				// Do this if no errors (calculate p-value, shade correct area)
+				var z = ((xBar-mu) / (sigma / Math.sqrt(n))).toFixed(4);
+
+				$ztext = $("td.z-val");
+				$ztext[0].innerHTML = "= " + z;
+				// Create polyData and append the correct path to var svg
+				var polyData = [];
+
+				var altForm = $("select#alt-hyp-select").val();
+
+				// Depends on form of alternative hypothesis - for now just do upper mu > mu_0:
+				var index1, index2;
+
+				// Find closest value to z - 
+				for (var j = 0; j < 1200; j++)
+				{
+					if (+xVals[j] > +z)
+					{
+						index1 = j;
+						break;
+					}
+				}
+
+				var xPaths =[];
+				var yPaths = [];
+
+				if (altForm == "1") {
+					xPaths.push(z);
+					yPaths.push(normPDF(z, 0, 1));
+
+					for (var i = index1; i < 1200; i++)
+					{
+						xPaths.push(xVals[i]);
+						yPaths.push(yVals[i]);
+					}
+
+
+					for (var i = 0; i < xPaths.length-1; i++)
+					{
+						var currObj = new Object();
+						currObj.string1 = xScale(xPaths[i]) + "," + yScale(0);
+						currObj.string2 = xScale(xPaths[i]) + "," + yScale(yPaths[i]);
+						currObj.string3 = xScale(xPaths[i+1]) + "," + yScale(yPaths[i+1]);
+						currObj.string4 = xScale(xPaths[i+1]) + "," + yScale(0);
+						currObj.string5 = xScale(xPaths[i]) + "," + yScale(0);
+						polyData.push(currObj);
+	 				}
+
+					// Polygondata for shading the normal curve denoting p-value
+
+					// Calculate area, do the shading here for the Z-statistic
+					svg.selectAll('path.poly').data(polyData).enter().append('path').attr('d', function(d) {
+						return "M" + d.string1 + "L" + d.string2 + "L" + d.string3 + "L" + d.string4 + "L" + d.string5;}).attr('fill', 'blue').attr("class", "poly");
+					var area = (1 - cdf(z, 0, 1)).toFixed(4);
+					$pval = $("div#p-val-div")
+					$pval[0].innerHTML = "<u>p-value:</u> " + area;
+				}
+				if (altForm === "2")
+				{
+
+					for (var i = 0; i < index1; i++)
+					{
+						xPaths.push(xVals[i]);
+						yPaths.push(yVals[i]);
+					}
+					xPaths.push(z);
+					yPaths.push(normPDF(z, 0, 1));
+
+					for (var i = 0; i < xPaths.length-1; i++)
+					{
+						var currObj = new Object();
+						currObj.string1 = xScale(xPaths[i]) + "," + yScale(0);
+						currObj.string2 = xScale(xPaths[i]) + "," + yScale(yPaths[i]);
+						currObj.string3 = xScale(xPaths[i+1]) + "," + yScale(yPaths[i+1]);
+						currObj.string4 = xScale(xPaths[i+1]) + "," + yScale(0);
+						currObj.string5 = xScale(xPaths[i]) + "," + yScale(0);
+						polyData.push(currObj);
+	 				}
+
+					// Polygondata for shading the normal curve denoting p-value
+
+					// Calculate area, do the shading here for the Z-statistic
+					svg.selectAll('path.poly').data(polyData).enter().append('path').attr('d', function(d) {
+						return "M" + d.string1 + "L" + d.string2 + "L" + d.string3 + "L" + d.string4 + "L" + d.string5;}).attr('fill', 'blue').attr("class", "poly");
+					var area = cdf(z, 0, 1).toFixed(4);
+					$pval = $("div#p-val-div")
+					$pval[0].innerHTML = "<u>p-value:</u> " + area;
+				}
+				if (altForm === "3")
+				{
+					// Different based on whether z is >= 0 or < 0
+					if (z >= 0)
+					{
+						// Find closest value to z - 
+						var negZ = (-1) * z;
+						for (var j = 0; j < 1200; j++)
+						{
+							if (+xVals[j] > negZ)
+							{
+								index2 = j;
+								break;
+							}
+						}
+						for (var i = 0; i < index2; i++)
+						{
+							xPaths.push(xVals[i]);
+							yPaths.push(yVals[i]);
+						}
+						xPaths.push(negZ);
+						yPaths.push(normPDF(negZ, 0, 1));
+						xPaths.push(z);
+						yPaths.push(normPDF(z, 0, 1));
+						for (var i = index1; i < 1200; i++)
+						{
+							xPaths.push(xVals[i]);
+							yPaths.push(yVals[i]);
+						}
+
+						for (var i = 0; i < xPaths.length-1; i++)
+						{
+							// Don't do it if the subsequent xPaths are too far away 
+							// Want to have a gap in the paths denoting the two tailed error
+							if (xPaths[i+1]-xPaths[i] < 0.1)
+							{
+								var currObj = new Object();
+								currObj.string1 = xScale(xPaths[i]) + "," + yScale(0);
+								currObj.string2 = xScale(xPaths[i]) + "," + yScale(yPaths[i]);
+								currObj.string3 = xScale(xPaths[i+1]) + "," + yScale(yPaths[i+1]);
+								currObj.string4 = xScale(xPaths[i+1]) + "," + yScale(0);
+								currObj.string5 = xScale(xPaths[i]) + "," + yScale(0);
+								polyData.push(currObj);
+							}
+		 				}
+
+						// Polygondata for shading the normal curve denoting p-value
+
+						// Calculate area, do the shading here for the Z-statistic
+						svg.selectAll('path.poly').data(polyData).enter().append('path').attr('d', function(d) {
+							return "M" + d.string1 + "L" + d.string2 + "L" + d.string3 + "L" + d.string4 + "L" + d.string5;}).attr('fill', 'blue').attr("class", "poly");
+						var area = 2 * (1 - cdf(z, 0, 1)).toFixed(4);
+						$pval = $("div#p-val-div")
+						$pval[0].innerHTML = "<u>p-value:</u> " + area;
+
+					}
+					if (z < 0)
+					{
+						// Find closest value to z - 
+						var negZ = (-1) * z;
+						for (var j = 0; j < 1200; j++)
+						{
+							if (+xVals[j] > negZ)
+							{
+								index2 = j;
+								break;
+							}
+						}
+						for (var i = 0; i < index1; i++)
+						{
+							xPaths.push(xVals[i]);
+							yPaths.push(yVals[i]);
+						}
+						xPaths.push(z);
+						yPaths.push(normPDF(z, 0, 1));
+						xPaths.push(negZ);
+						yPaths.push(normPDF(negZ, 0, 1));
+						for (var i = index2; i < 1200; i++)
+						{
+							xPaths.push(xVals[i]);
+							yPaths.push(yVals[i]);
+						}
+
+						for (var i = 0; i < xPaths.length-1; i++)
+						{
+							// Don't do it if the subsequent xPaths are too far away 
+							// Want to have a gap in the paths denoting the two tailed error
+							if (xPaths[i+1]-xPaths[i] < 0.1)
+							{
+								var currObj = new Object();
+								currObj.string1 = xScale(xPaths[i]) + "," + yScale(0);
+								currObj.string2 = xScale(xPaths[i]) + "," + yScale(yPaths[i]);
+								currObj.string3 = xScale(xPaths[i+1]) + "," + yScale(yPaths[i+1]);
+								currObj.string4 = xScale(xPaths[i+1]) + "," + yScale(0);
+								currObj.string5 = xScale(xPaths[i]) + "," + yScale(0);
+								polyData.push(currObj);
+							}
+		 				}
+
+						// Polygondata for shading the normal curve denoting p-value
+
+						// Calculate area, do the shading here for the Z-statistic
+						svg.selectAll('path.poly').data(polyData).enter().append('path').attr('d', function(d) {
+							return "M" + d.string1 + "L" + d.string2 + "L" + d.string3 + "L" + d.string4 + "L" + d.string5;}).attr('fill', 'blue').attr("class", "poly");
+						var area = 2 * cdf(z, 0, 1).toFixed(4);
+						$pval = $("div#p-val-div")
+						$pval[0].innerHTML = "<u>p-value:</u> " + area;
+					}
+				}
+
+			}
+		}
+	});
+});
+
+
+
+
+</script>
