@@ -282,6 +282,9 @@ $(document).ready(function() {
   // Append Plot title, yAxisTitle and xAxisTitle
   svg.append('text').attr("x", width / 2).attr("y", padding / 2).attr("text-anchor", "middle").attr("class", "title").text("Standard Normal Distribution");
 
+  // createCurveAxes - plot the density curve of a normal distribution
+  // mean - mean of the normal distribution 
+  // sigma - standard deviation of the normal distribution
   var createCurveAxes = function(mean, sigma)
   {
     xVals = [];
@@ -328,6 +331,48 @@ $(document).ready(function() {
 	                            .attr("stroke", "black")
 	                            .attr("stroke-width", 2)
 	                            .attr("fill", "none").attr("class", "curve");
+  }
+
+  // shadeCurve - shae the normal distribution based on the shaded area depicted in problem
+  // x0 - initial value to start shading (drawing rectangles)
+  // x1 - ending value to stop shading at
+  // mean - mean of normal distribution (to determing density, i.e. height of rectangle)
+  // sigma - standard deviaton of normal distribution (also do determine height)
+  var shadeCurve = function(x0, x1, mean, sigma)
+  {
+    var xValsShade = [];
+    var yValsShade = [];
+
+    // build xVals vector from x0 to x1
+    var stepSize = sigma / 100;
+    var numSteps = Math.ceil((x1 - x0) / stepSize)
+    for (var i = 0; i < numSteps; i++)
+    {
+      xValsShade.push(x0 + stepSize * i);
+      yValsShade.push(normPDF(x0 + stepSize * i, mean, sigma))
+    }
+
+    var polyData = [];
+
+    // Setup x and y scales to map to SVG 
+    var xScale = d3.scale.linear().domain([-6 * sigma + mean, 6 * sigma + mean]).range([padding, width-padding]);
+    var yScale = d3.scale.linear().domain([getMinOfArray(yVals), getMaxOfArray(yVals)]).range([height-padding, padding]);
+
+    // create polyData
+    for (var i = 0; i < xValsShade.length-1; i++)
+    {
+      var currObj = new Object();
+      currObj.string1 = xScale(xValsShade[i]) + "," + yScale(0);
+      currObj.string2 = xScale(xValsShade[i]) + "," + yScale(yValsShade[i]);
+      currObj.string3 = xScale(xValsShade[i+1]) + "," + yScale(yValsShade[i+1]);
+      currObj.string4 = xScale(xValsShade[i+1]) + "," + yScale(0);
+      currObj.string5 = xScale(xValsShade[i]) + "," + yScale(0);
+      polyData.push(currObj);
+    }
+
+    // Calculate area, do the shading here for the Z-statistic
+    svg.selectAll('path.poly').data(polyData).enter().append('path').attr('d', function(d) {
+      return "M" + d.string1 + "L" + d.string2 + "L" + d.string3 + "L" + d.string4 + "L" + d.string5;}).attr('fill', 'blue').attr("class", "poly");
   }
 
   createCurveAxes(0, 1);
@@ -674,42 +719,65 @@ $(document).ready(function() {
 		}
 		if (probType === 1)
 		{
-
-			$expDiv = $("div#explanation-details");
+			
+      $expDiv = $("div#explanation-details");
       var userAnswer = +$("input#z0").val();
+      
       if (userAnswer === +ZVal)
       {
         alert("Great Job! You answered correctly. For a complete explanation, please see the Solution Explanation.");
       } else {
         alert("Whoops! It looks like we got off track somewhere. For a complete explanation of the solution, please see the Solution Explanation. Then try another problem!");
       }
-			$expDiv[0].innerHTML = "<b>1.</b> Look in the body of the Z Table for the cell probability that is closest to " + randProb + "<br> <b>2.</b> Use the 1st column and first row to determine the corresponding Z value. Remember that if two probabilities are equally close, we average the corresponding Z values. <br> <b>3.</b> The correct answer is: z<sub>0</sub> = " + ZVal;
+			
+      $expDiv[0].innerHTML = "<b>1.</b> Look in the body of the Z Table for the cell probability that is closest to " + randProb + "<br> <b>2.</b> Use the 1st column and first row to determine the corresponding Z value. Remember that if two probabilities are equally close, we average the corresponding Z values. <br> <b>3.</b> The correct answer is: z<sub>0</sub> = " + ZVal;
+      
+      d3.selectAll("path.poly").remove();
+
+      // Shade the corresponding area
+      shadeCurve(-6, +ZVal, 0, 1);
 		}
 		if (probType === 2)
 		{
-			ZVal = ((-1) * ZVal).toFixed(2);
+			
+      ZVal = ((-1) * ZVal).toFixed(2);
 			$expDiv = $("div#explanation-details");
       var userAnswer = +$("input#z0").val();
+      
       if (userAnswer === +ZVal)
       {
         alert("Great Job! You answered correctly. For a complete explanation, please see the Solution Explanation.");
       } else {
         alert("Whoops! It looks like we got off track somewhere. For a complete explanation of the solution, please see the Solution Explanation. Then try another problem!");
       }
+
 			$expDiv[0].innerHTML = "<b>1.</b> Recall that P(Z > z<sub>0</sub>) = 1 - P(Z < z<sub>0</sub>), which implies we want to find z<sub>0</sub> satisfying P(Z < z<sub>0</sub>) = " + (1 - randProb).toFixed(4) + ". <br> <b>2.</b> Look in the body of the Z Table for the cell probability that is closest to " + (1 - randProb).toFixed(4) + "<br> <b>3.</b> Use the 1st column and first row to determine the corresponding Z value. Remember that if two probabilities are equally close, we average the corresponding Z values. <br> <b>4.</b> The correct answer is: z<sub>0</sub> = " + ZVal;
-		}
+		  
+      d3.selectAll("path.poly").remove();
+
+      // Shade the corresponding area
+      shadeCurve(+ZVal, 6, 0, 1);
+    }
 		if (probType === 3)
 		{
-			$expDiv = $("div#explanation-details");
+			
+      $expDiv = $("div#explanation-details");
       var userAnswer = +$("input#z0").val();
+      
       if (userAnswer === +ZVal)
       {
         alert("Great Job! You answered correctly. For a complete explanation, please see the Solution Explanation.");
       } else {
         alert("Whoops! It looks like we got off track somewhere. For a complete explanation of the solution, please see the Solution Explanation. Then try another problem!");
       }      
-			$expDiv[0].innerHTML = "<b>1.</b> Recall that P(-z<sub>0</sub> < Z < z<sub>0</sub>) = p implies that 2P(Z < z<sub>0</sub>) - 1 = p. In this case that translates to: P(-z<sub>0</sub> < Z < z<sub>0</sub>) = " + displayProb + " implies P(Z < z<sub>0</sub>) = " + randProb + ". <br> <b>2.</b> Look in the body of the Z Table for the cell probability that is closest to " + randProb + "<br> <b>3.</b> Use the 1st column and first row to determine the corresponding Z value. <br> <b>4.</b> The correct answer is: z<sub>0</sub> = " +  ZVal;
-		}
+			
+      $expDiv[0].innerHTML = "<b>1.</b> Recall that P(-z<sub>0</sub> < Z < z<sub>0</sub>) = p implies that 2P(Z < z<sub>0</sub>) - 1 = p. In this case that translates to: P(-z<sub>0</sub> < Z < z<sub>0</sub>) = " + displayProb + " implies P(Z < z<sub>0</sub>) = " + randProb + ". <br> <b>2.</b> Look in the body of the Z Table for the cell probability that is closest to " + randProb + "<br> <b>3.</b> Use the 1st column and first row to determine the corresponding Z value. <br> <b>4.</b> The correct answer is: z<sub>0</sub> = " +  ZVal;
+		
+      d3.selectAll("path.poly").remove();
+
+      // Shade the corresponding area
+      shadeCurve(-+ZVal, +ZVal, 0, 1);
+    }
 		if (probType === 4)
 		{
 			ZProb1 = ZTableKey[randZ1];
